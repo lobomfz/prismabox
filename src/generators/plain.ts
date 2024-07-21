@@ -1,108 +1,41 @@
 import type { DMMF } from "@prisma/generator-helper";
-import { extractAnnotations } from "../annotations/annotations";
-import { generateTypeboxOptions } from "../annotations/options";
-import { getConfig } from "../config";
+import { extractAnnotations, shouldIgnore } from "../annotations/annotations";
 import type { ProcessedModel } from "../model";
-import { processedEnums } from "./enum";
-import {
-  type PrimitivePrismaFieldType,
-  isPrimitivePrismaFieldType,
-  stringifyPrimitiveType,
-} from "./primitiveField";
-import { wrapWithArray } from "./wrappers/array";
-import { wrapWithNullable } from "./wrappers/nullable";
-import { wrapWithOptional } from "./wrappers/optional";
+import { Field } from "./primitiveField";
+import { makeValue } from "./generator";
 
 export const processedPlain: ProcessedModel[] = [];
 
 export function processPlain(models: DMMF.Model[] | Readonly<DMMF.Model[]>) {
-  for (const m of models) {
-    const o = stringifyPlain(m);
-    if (o) {
-      processedPlain.push({ name: m.name, stringRepresentation: o });
-    }
-  }
-  Object.freeze(processedPlain);
+	for (const model of models) {
+		const stringRepresentation = stringifyPlain(model);
+
+		if (stringRepresentation) {
+			processedPlain.push({ name: model.name, stringRepresentation });
+		}
+	}
+
+	Object.freeze(processedPlain);
 }
 
-export function stringifyPlain(data: DMMF.Model, isInputModel = false) {
-  const annotations = extractAnnotations(data.documentation);
-  if (annotations.isHidden || (isInputModel && annotations.isHiddenInput))
-    return undefined;
+function stringifyPlain(data: DMMF.Model) {
+	const annotations = extractAnnotations(data.documentation);
 
-  const fields = data.fields
-    .map((field) => {
-      const annotations = extractAnnotations(field.documentation);
-      if (annotations.isHidden || (isInputModel && annotations.isHiddenInput))
-        return undefined;
+	if (shouldIgnore(annotations)) return undefined;
 
-      // ===============================
-      // INPUT MODEL FILTERS
-      // ===============================
-      // if we generate an input model we want to omit certain fields
+	const fields: string[] = [];
 
-      if (getConfig().ignoreIdOnInputModel && isInputModel && field.isId)
-        return undefined;
-      if (
-        getConfig().ignoreCreatedAtOnInputModel &&
-        isInputModel &&
-        field.name === "createdAt" &&
-        field.hasDefaultValue
-      )
-        return undefined;
-      if (
-        getConfig().ignoreUpdatedAtOnInputModel &&
-        isInputModel &&
-        field.isUpdatedAt
-      )
-        return undefined;
+	for (const field of data.fields) {
+		const annotations = extractAnnotations(field.documentation);
 
-      if (
-        isInputModel &&
-        (field.name.toLowerCase().endsWith("id") ||
-          field.name.toLowerCase().endsWith("foreign") ||
-          field.name.toLowerCase().endsWith("foreignkey"))
-      ) {
-        return undefined;
-      }
+		if (shouldIgnore(annotations, field)) {
+			continue;
+		}
 
-      // ===============================
-      // INPUT MODEL FILTERS END
-      // ===============================
+		const parsed = new Field({ field, annotations }).parse();
 
-      let stringifiedType = "";
+		if (parsed) fields.push(parsed);
+	}
 
-      if (isPrimitivePrismaFieldType(field.type)) {
-        stringifiedType = stringifyPrimitiveType({
-          fieldType: field.type as PrimitivePrismaFieldType,
-          options: generateTypeboxOptions(annotations),
-        });
-      } else if (processedEnums.find((e) => e.name === field.type)) {
-        // biome-ignore lint/style/noNonNullAssertion: we checked this manually
-        stringifiedType = processedEnums.find(
-          (e) => e.name === field.type,
-        )!.stringRepresentation;
-      } else {
-        return undefined;
-      }
-
-      if (field.isList) {
-        stringifiedType = wrapWithArray(stringifiedType);
-      }
-
-      if (!field.isRequired) {
-        stringifiedType = wrapWithNullable(stringifiedType);
-        if (isInputModel) {
-          stringifiedType = wrapWithOptional(stringifiedType);
-        }
-      }
-
-      return `${field.name}: ${stringifiedType}`;
-    })
-    .filter((x) => x) as string[];
-
-  return `${getConfig().typeboxImportVariableName}.Object({${[
-    ...fields,
-    getConfig().additionalFieldsPlain ?? [],
-  ].join(",")}},${generateTypeboxOptions(annotations)})\n`;
+	return makeValue(fields, "Object", annotations);
 }

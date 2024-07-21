@@ -1,42 +1,43 @@
 {
-  "name": "prismabox",
-  "version": "2.2.0",
-  "license": "MIT",
-  "description": "Typebox generator for prisma schema",
-  "author": {
-    "name": "Ade Yahya Prasetyo, m1212e"
-  },
-  "keywords": [
-    "prisma2",
-    "prisma",
-    "prisma-generator",
-    "prisma-schema",
-    "code-generation",
-    "typebox",
-    "typebox-generator",
-    "prismabox"
-  ],
-  "homepage": "https://github.com/m1212e/prismabox",
-  "repository": {
-    "url": "https://github.com/m1212e/prismabox.git"
-  },
-  "scripts": {
-    "dev": "bun run build && bunx prisma generate",
-    "build": "bun run typecheck && bun build.ts",
-    "lint": "biome check --write .",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@prisma/generator-helper": "^5.10.2",
-    "@sinclair/typebox": "^0.32.15",
-    "prettier": "^3.2.5"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^1.8.3",
-    "@prisma/client": "5.10.2",
-    "@types/bun": "latest",
-    "esbuild": "^0.20.1",
-    "prisma": "5.10.2",
-    "typescript": "^5.4.2"
-  }
+	"name": "prismabox",
+	"version": "2.2.0",
+	"license": "MIT",
+	"description": "Typebox generator for prisma schema",
+	"author": {
+		"name": "Ade Yahya Prasetyo, m1212e"
+	},
+	"keywords": [
+		"prisma2",
+		"prisma",
+		"prisma-generator",
+		"prisma-schema",
+		"code-generation",
+		"typebox",
+		"typebox-generator",
+		"prismabox"
+	],
+	"homepage": "https://github.com/m1212e/prismabox",
+	"repository": {
+		"url": "https://github.com/m1212e/prismabox.git"
+	},
+	"scripts": {
+		"dev": "bun run build && bunx prisma generate",
+		"build": "bun run typecheck",
+		"lint": "biome check --write .",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@biomejs/js-api": "^0.6.2",
+		"@biomejs/wasm-nodejs": "^1.8.3",
+		"@prisma/generator-helper": "^5.17.0",
+		"@sinclair/typebox": "^0.32.34"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.8.3",
+		"@prisma/client": "5.17.0",
+		"@types/bun": "^1.1.6",
+		"esbuild": "^0.23.0",
+		"prisma": "5.17.0",
+		"typescript": "^5.5.3"
+	}
 }

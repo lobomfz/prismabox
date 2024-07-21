@@ -1,10 +1,13 @@
-import { format as prettierFormat } from "prettier";
+import { Biome, Distribution } from "@biomejs/js-api";
 
-export async function format(input: string) {
-  try {
-    return await prettierFormat(input, { parser: "typescript" });
-  } catch (error) {
-    console.error("Error formatting file", error);
-    return input;
-  }
+const biome = await Biome.create({
+	distribution: Distribution.NODE,
+});
+
+export function format(input: string) {
+	const formatted = biome.formatContent(input, {
+		filePath: "example.ts",
+	});
+
+	return formatted.content;
 }

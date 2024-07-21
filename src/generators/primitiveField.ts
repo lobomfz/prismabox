@@ -1,71 +1,114 @@
-import { getConfig } from "../config";
+import type { DMMF } from "@prisma/generator-helper";
+import type { fullAnotation } from "../annotations/annotations";
+import { config, t } from "../config";
+import { generateTypeboxOptions } from "../annotations/options";
+import { processedEnums } from "./enum";
+import { makeValue, type TypeboxNames } from "./generator";
 
 const PrimitiveFields = [
-  "Int",
-  "BigInt",
-  "Float",
-  "Decimal",
-  "String",
-  "DateTime",
-  "Json",
-  "Boolean",
-  "Bytes",
+	"Int",
+	"BigInt",
+	"Float",
+	"Decimal",
+	"String",
+	"DateTime",
+	"Json",
+	"Boolean",
+	"Bytes",
 ] as const;
 
-export type PrimitivePrismaFieldType = (typeof PrimitiveFields)[number];
+type PrimitivePrismaFieldType = (typeof PrimitiveFields)[number];
 
 export function isPrimitivePrismaFieldType(
-  str: string
+	str: string,
 ): str is PrimitivePrismaFieldType {
-  // biome-ignore lint/suspicious/noExplicitAny: we want to check if the string is a valid primitive field
-  return PrimitiveFields.includes(str as any);
+	return PrimitiveFields.includes(str as any);
 }
 
-export function stringifyPrimitiveType({
-  fieldType,
-  options,
-}: {
-  fieldType: PrimitivePrismaFieldType;
-  options: string;
-}) {
-  if (["Int", "BigInt"].includes(fieldType)) {
-    return `${getConfig().typeboxImportVariableName}.Integer(${options})`;
-  }
+const fieldTypeMap: Record<PrimitivePrismaFieldType, TypeboxNames> = {
+	Int: "Integer",
+	BigInt: "Integer",
+	Float: "Number",
+	Decimal: "Number",
+	String: "String",
+	DateTime: "Date",
+	Json: "Any",
+	Boolean: "Boolean",
+	Bytes: "Uint8Array",
+};
 
-  if (["Float", "Decimal"].includes(fieldType)) {
-    return `${getConfig().typeboxImportVariableName}.Number(${options})`;
-  }
+export class Field {
+	private string: string;
+	private defaultOptions = generateTypeboxOptions();
+	private ignore = false;
+	private field: Partial<DMMF.Model["fields"][number]>;
 
-  if (fieldType === "String") {
-    return `${getConfig().typeboxImportVariableName}.String(${options})`;
-  }
+	constructor(data: {
+		field: Partial<DMMF.Model["fields"][number]>;
+		annotations?: fullAnotation;
+		initialString?: string;
+	}) {
+		const { field, annotations, initialString } = data;
 
-  if (["DateTime"].includes(fieldType)) {
-    const config = getConfig();
-    let opts = options;
-    if (config.useJsonTypes) {
-      if (opts.includes("{") && opts.includes("}")) {
-        opts = opts.replace("{", "{ format: 'date-time', ");
-      } else {
-        opts = `{ format: 'date-time' }`;
-      }
-      return `${config.typeboxImportVariableName}.String(${opts})`;
-    }
+		this.field = field;
 
-    return `${getConfig().typeboxImportVariableName}.Date(${options})`;
-  }
+		if (field.type && !isPrimitivePrismaFieldType(field.type)) {
+			const thisEnum = processedEnums.find((e) => e.name === field.type);
 
-  if (fieldType === "Json") {
-    return `${getConfig().typeboxImportVariableName}.Any(${options})`;
-  }
+			if (!thisEnum) {
+				this.ignore = true;
+				this.string = "";
+				return;
+			}
 
-  if (fieldType === "Boolean") {
-    return `${getConfig().typeboxImportVariableName}.Boolean(${options})`;
-  }
+			this.string = thisEnum.stringRepresentation;
+			return;
+		}
 
-  if (fieldType === "Bytes") {
-    return `${getConfig().typeboxImportVariableName}.Uint8Array(${options})`;
-  }
+		if (initialString) {
+			this.string = initialString;
+			return;
+		}
 
-  throw new Error("Invalid type for primitive generation");
+		if (field.type && field.type in fieldTypeMap) {
+			const type = fieldTypeMap[field.type as keyof typeof fieldTypeMap];
+
+			this.string = makeValue([], type, annotations);
+			return;
+		}
+
+		throw new Error("unsupported field type");
+	}
+
+	private wrapWithArray() {
+		this.string = `${t}.Array(${this.string}${this.defaultOptions ? `, ${this.defaultOptions}` : ""})`;
+
+		return this;
+	}
+
+	private wrapWithNullable() {
+		this.string = `${config.nullableName}(${this.string})`;
+
+		return this;
+	}
+
+	private wrapWithOptional() {
+		this.string = `${t}.Optional(${this.string})`;
+
+		return this;
+	}
+
+	parse() {
+		if (this.ignore) return null;
+
+		if (this.field.isList) {
+			this.wrapWithArray();
+		}
+
+		if (!this.field.isRequired) {
+			this.wrapWithNullable().wrapWithOptional();
+		}
+
+		return `${this.field.name}: ${this.string}`;
+	}
 }

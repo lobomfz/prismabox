@@ -1,25 +1,24 @@
-import { getConfig } from "../config";
-import { type extractAnnotations, isOptionsVariant } from "./annotations";
+import { config } from "../config";
+import type { fullAnotation, Options } from "./annotations";
 
-export function generateTypeboxOptions(
-  input?: ReturnType<typeof extractAnnotations>,
-): string {
-  const stringifiedOptions: string[] = [];
-  for (const annotation of input?.annotations ?? []) {
-    if (isOptionsVariant(annotation)) {
-      stringifiedOptions.push(annotation.value);
-    }
-  }
+export function generateTypeboxOptions(input?: fullAnotation | null) {
+	const options: Options = input?.data ?? {};
 
-  stringifiedOptions.push(
-    `additionalProperties: ${getConfig().additionalProperties}`,
-  );
+	for (const annotation of input?.annotations ?? []) {
+		if (annotation.type === "OPTIONS") {
+			for (const [key, value] of Object.entries(annotation.values)) {
+				options[key] = value;
+			}
+		}
+	}
 
-  if (input?.description) {
-    stringifiedOptions.push(`description: \`${input.description}\``);
-  }
+	if (!config.additionalProperties) {
+		options.additionalProperties = false;
+	}
 
-  return stringifiedOptions.length > 0
-    ? `{${stringifiedOptions.join(",")}}`
-    : "";
+	if (!Object.keys(options).length) {
+		return null;
+	}
+
+	return options;
 }
